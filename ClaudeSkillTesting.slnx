@@ -1,0 +1,36 @@
+<Solution>
+  <Project Path="WeatherApi/WeatherApi.csproj" />
+  <Project Path="WeatherApi.SkillTests/WeatherApi.SkillTests.csproj" />
+  <Folder Name="/_root/">
+    <File Path="README.md" />
+    <File Path=".dockerignore" />
+    <File Path="Dockerfile" />
+    <File Path="run-skill.sh" />
+  </Folder>
+  <Folder Name="/skills/weather-api-security/">
+    <File Path="skills/weather-api-security/SKILL.md" />
+  </Folder>
+  <Folder Name="/skills/weather-api-security-weakened/">
+    <File Path="skills/weather-api-security-weakened/SKILL.md" />
+  </Folder>
+  <Folder Name="/skills/weather-api-security-mislabeled/">
+    <File Path="skills/weather-api-security-mislabeled/SKILL.md" />
+  </Folder>
+  <Folder Name="/skills/secret-audit/">
+    <File Path="skills/secret-audit/SKILL.md" />
+    <File Path="skills/secret-audit/audit.sh" />
+  </Folder>
+  <Folder Name="/skills/secret-audit-weakened/">
+    <File Path="skills/secret-audit-weakened/SKILL.md" />
+    <File Path="skills/secret-audit-weakened/audit.sh" />
+  </Folder>
+  <Folder Name="/skills/humanize-code/">
+    <File Path="skills/humanize-code/SKILL.md" />
+  </Folder>
+  <Folder Name="/skills/humanize-code-weakened/">
+    <File Path="skills/humanize-code-weakened/SKILL.md" />
+  </Folder>
+  <Folder Name="/.github/">
+    <File Path=".github/workflows/skill-tests.yml" />
+  </Folder>
+</Solution>

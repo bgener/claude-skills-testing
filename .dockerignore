@@ -1,0 +1,11 @@
+.git
+.vs
+.vscode
+.idea
+**/bin
+**/obj
+prompts
+README.md
+*.md
+!skills/**/*.md
+!skills-weakened/**/*.md

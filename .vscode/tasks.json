@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/ClaudeSkillTesting.slnx"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "test: strict skill (should pass)",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/ClaudeSkillTesting.slnx",
+        "--logger",
+        "console;verbosity=detailed"
+      ],
+      "options": {
+        "env": {
+          "SKILL_SOURCE": "skills"
+        }
+      },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "test: weakened skill (demo - should fail)",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/ClaudeSkillTesting.slnx",
+        "--logger",
+        "console;verbosity=detailed"
+      ],
+      "options": {
+        "env": {
+          "SKILL_SOURCE": "skills-weakened"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: build runner image",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "build",
+        "-t",
+        "claudeskilltesting/runner:latest",
+        "-f",
+        "${workspaceFolder}/tests/Dockerfile",
+        "${workspaceFolder}/tests"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

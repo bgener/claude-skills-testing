@@ -1,0 +1,11 @@
+{
+  "dotnet.defaultSolution": "ClaudeSkillTesting.slnx",
+  "files.associations": {
+    "*.slnx": "xml",
+    "Dockerfile": "dockerfile"
+  },
+  "[csharp]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp",
+    "editor.formatOnSave": true
+  }
+}

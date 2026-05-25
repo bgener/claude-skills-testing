@@ -1,0 +1,34 @@
+name: Skill tests
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+      - 'skills-weakened/**'
+      - 'tests/**'
+      - '.github/workflows/skill-tests.yml'
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: skill-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run skill tests
+        env:
+          # The fixture forwards whichever auth env var is set.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: dotnet test ClaudeSkillTesting.slnx --logger "console;verbosity=normal" --nologo
