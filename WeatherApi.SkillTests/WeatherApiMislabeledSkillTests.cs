@@ -26,6 +26,7 @@ public class WeatherApiMislabeledSkillTests(SkillTestFixture fixture, ITestOutpu
         // Act
         SkillRun run = await fixture.RunAsync("weather-api-security-mislabeled", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillFailed(run);

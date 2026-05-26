@@ -23,6 +23,7 @@ public class SecretAuditSkillTests(SkillTestFixture fixture, ITestOutputHelper o
         // Act
         SkillRun run = await fixture.RunAsync("secret-audit", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillSucceeded(run);
@@ -44,6 +45,7 @@ public class SecretAuditSkillTests(SkillTestFixture fixture, ITestOutputHelper o
         // Act
         SkillRun run = await fixture.RunAsync("secret-audit", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillSucceeded(run);
@@ -65,6 +67,7 @@ public class SecretAuditSkillTests(SkillTestFixture fixture, ITestOutputHelper o
         // Act
         SkillRun run = await fixture.RunAsync("secret-audit", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         // Claude Code logs every tool call to a JSONL session log; a Bash invocation of

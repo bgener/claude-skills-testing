@@ -23,6 +23,7 @@ public class WeatherApiSkillTests(SkillTestFixture fixture, ITestOutputHelper ou
         // Act
         SkillRun run = await fixture.RunAsync("weather-api-security", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillSucceeded(run);
@@ -44,6 +45,7 @@ public class WeatherApiSkillTests(SkillTestFixture fixture, ITestOutputHelper ou
         // Act
         SkillRun run = await fixture.RunAsync("weather-api-security", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillSucceeded(run);
@@ -65,6 +67,7 @@ public class WeatherApiSkillTests(SkillTestFixture fixture, ITestOutputHelper ou
         // Act
         SkillRun run = await fixture.RunAsync("weather-api-security", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillSucceeded(run);

@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
@@ -67,7 +68,26 @@ public sealed class SkillTestFixture : IAsyncLifetime
         using CancellationTokenSource cts = new(TimeSpan.FromMinutes(15));
         ExecResult r = await _container.ExecAsync(["run-skill", skill, prompt], cts.Token);
         string toolLog = await ReadLatestSessionLogAsync();
-        return new SkillRun($"{r.Stdout}\n{r.Stderr}", _hostWorkspace, toolLog);
+        string transcript = $"{r.Stdout}\n{r.Stderr}";
+        string artifactPath = ZipWorkspace(skill, transcript, toolLog);
+        return new SkillRun(transcript, _hostWorkspace, toolLog, artifactPath);
+    }
+
+    private string ZipWorkspace(string skill, string transcript, string toolLog)
+    {
+        string artifactsDir = Path.Combine(FindRepoRoot(), "TestArtifacts");
+        Directory.CreateDirectory(artifactsDir);
+
+        string timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        string id = Guid.NewGuid().ToString("N")[..8];
+        string zipPath = Path.Combine(artifactsDir, $"{skill}-{timestamp}-{id}.zip");
+
+        File.WriteAllText(Path.Combine(_hostWorkspace, "_transcript.txt"), transcript);
+        if (!string.IsNullOrEmpty(toolLog))
+            File.WriteAllText(Path.Combine(_hostWorkspace, "_toollog.jsonl"), toolLog);
+
+        ZipFile.CreateFromDirectory(_hostWorkspace, zipPath);
+        return zipPath;
     }
 
     /// Claude Code writes a JSONL session log of every tool call to

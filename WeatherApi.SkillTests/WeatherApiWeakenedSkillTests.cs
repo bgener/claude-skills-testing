@@ -24,6 +24,7 @@ public class WeatherApiWeakenedSkillTests(SkillTestFixture fixture, ITestOutputH
         // Act
         SkillRun run = await fixture.RunAsync("weather-api-security-weakened", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillFailed(run);

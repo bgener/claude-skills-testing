@@ -19,6 +19,7 @@ public class HumanizeCodeSkillTests(SkillTestFixture fixture, ITestOutputHelper 
         // Act
         SkillRun run = await fixture.RunAsync("humanize-code", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillSucceeded(run);

@@ -7,7 +7,7 @@ SKILL=$1
 PROMPT=$2
 APP=/workspace/app
 
-rm -rf "$APP"
+find "$APP" -mindepth 1 -delete 2>/dev/null || true
 mkdir -p "$APP/.claude/skills"
 cp -r /scaffold/. "$APP/"
 cp -r "/skills/$SKILL" "$APP/.claude/skills/"

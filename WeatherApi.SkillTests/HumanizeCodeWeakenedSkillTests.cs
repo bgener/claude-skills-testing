@@ -20,6 +20,7 @@ public class HumanizeCodeWeakenedSkillTests(SkillTestFixture fixture, ITestOutpu
         // Act
         SkillRun run = await fixture.RunAsync("humanize-code-weakened", prompt);
         output.WriteLine(run.Transcript);
+        output.WriteLine($"Artifact: {run.ArtifactPath}");
 
         // Assert
         AssertSkillFailed(run);
