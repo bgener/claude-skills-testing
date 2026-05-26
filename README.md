@@ -1,147 +1,57 @@
 # AI Skill Testing
 
-xUnit + Testcontainers harness for Claude Code skills. Runs Claude in Docker, drops a skill in, fires a prompt at it, then asserts on the resulting code.
+A demo of how to write automated tests for Claude Code skills, so the skill keeps doing what you wrote it to do over time.
 
-A skill is not just Markdown. It can ship scripts the agent is expected to run. And the skill's frontmatter `description:` is what Claude reads to decide whether to even load the skill. This harness tests all three: rules, scripts, and selection.
+## Why
 
-## Three skills, three failure modes
+A skill is Markdown plus optional scripts. It works today. Six weeks from now someone tweaks the description, weakens a rule, or breaks the script — and the agent silently regresses. The codebase fills with leaked secrets, AI-style noise, half-followed conventions. Every PR burns tokens for worse output.
 
-| Skill | Strict | Drift variant | What it demos |
-|---|---|---|---|
-| `weather-api-security` | bans API keys in `appsettings.json` | `skills-weakened/` (weak rules) and `skills-mislabeled/` (wrong description, correct rules) | One skill, two ways to break: weakened rules, wrong routing. |
-| `secret-audit` (Markdown + `audit.sh`) | scans the working tree for known secret prefixes | `skills-weakened/` (missing `weather_live_` pattern) | A script in the skill can have its own bug that tests need to catch. |
-| `humanize-code` | bans AI fingerprints in code: `// Step ...`, `// TODO`, narrative comments | `skills-weakened/` (actively encourages those patterns) | Code-style drift. Without tests, the agent silently regresses, every PR fills with noise. |
+Tests catch the drift before merge.
 
-Flip `$env:SKILL_SOURCE = "skills-weakened"` and the strict tests turn red.
+## The idea
+
+You change a skill. You want to know: what would the agent actually do now? Two ways to find out:
+
+- **Read the response.** The agent's transcript — what it said, what it claimed to do.
+- **Check the files.** Open whatever the agent edited and look. Did the secret end up in `appsettings.json`? Does the controller have `// TODO` comments?
+
+Tests open the files. Either `appsettings.json` contains the secret or it does not. The agent's response can claim anything. The exception is verifying that a skill's script ran. No file change proves that, so the test reads Claude Code's session log for the Bash tool call.
+
+## What this repo shows
+
+Three failure modes, each demoed with a strict skill and a deliberately drifted copy:
+
+| Skill | Drift target | What the test catches |
+|---|---|---|
+| `weather-api-security` | weakened rules | Skill says "exceptions allowed" → secret leaks into `appsettings.json` |
+| `weather-api-security` | mislabeled description | Description points to wrong domain → agent never loads the skill → secret leaks |
+| `secret-audit` | script bug + missing invocation | Script no longer matches the secret prefix; or skill stops telling the agent to run the script |
+| `humanize-code` | rules removed | "Ban these patterns" turns into "use your judgement" → `// Step 1`, `// TODO` come back |
 
 ## Run it
 
 ```powershell
-# One-time setup
-npm install -g @anthropic-ai/claude-code
-claude setup-token                                   # browser flow, prints sk-ant-oat...
+claude setup-token                                          # one time
 [Environment]::SetEnvironmentVariable("CLAUDE_CODE_OAUTH_TOKEN","sk-ant-oat-...","User")
-
-# Then in any new terminal:
 dotnet test ClaudeSkillTesting.slnx
 ```
 
-Needs Docker Desktop running and the .NET 10 SDK. First run builds the image (~1 min); image is then shared across all test classes.
+Needs Docker Desktop and .NET 10 SDK.
 
-To run only one class or one test:
+## Under the hood
 
-```powershell
-dotnet test --filter "FullyQualifiedName~WeatherApiSkillTests"
-dotnet test --filter "FullyQualifiedName~ItShouldRefuseToWriteTheKeyWhenSuppliedDirectly"
-```
+**Per test:** spin up a container that has Claude CLI, the pre-built `WeatherApi` scaffold, and all skills baked in. The container runs as an unprivileged `tester` user — Claude CLI refuses `--dangerously-skip-permissions` when invoked as root. That's the `RUN useradd … chown …` block in the Dockerfile: create the user, pre-create `/workspace` and `/home/tester/.claude` so the bind mounts land in directories `tester` already owns.
 
-## How a skill is structured
+**Workspace isolation.** Each test class fixture creates its own host temp directory (`%TEMP%/skill-test-<guid>`) and bind-mounts it at `/workspace/app`. Within a class, `run-skill.sh` wipes `/workspace/app` and copies the scaffold fresh at the start of every test — so test 2 never sees test 1's files. Across classes, fixtures don't share anything: separate containers, separate host directories.
 
-A skill is a folder under `skills/<name>/` that the fixture copies into the workspace at `.claude/skills/<name>/`. Claude Code picks it up automatically because of that path.
+**Parallelism.** xUnit runs different test classes in parallel by default. Tests inside the same class run serially against the class's container. The Docker image itself is built once and shared across all fixtures (a static semaphore in the fixture serializes the first build, others reuse). So wall time is roughly "the slowest class running its tests serially."
 
-```
-skills/secret-audit/
-  SKILL.md     YAML frontmatter (name, description) + the rule
-  audit.sh     optional script the SKILL.md tells the agent to run
-```
+**Security model.** The container is disposable (`WithCleanUp(true)` — gone after the run). Two bind mounts: the workspace temp dir read-write, and the host's `~/.claude/.credentials.json` read-only so Claude CLI can authenticate. The credentials file is the main asset inside the container, so if you'd rather not surface it there, use `ANTHROPIC_API_KEY` instead — it works standalone, no credentials file needed, and the fixture skips that mount automatically. The `--dangerously-skip-permissions` flag lets Claude run any command, but only inside the container — the host filesystem outside of the bind-mounted workspace is unreachable.
 
-YAML frontmatter:
+## Where to look
 
-```yaml
----
-name: secret-audit
-description: Use after any code change. Runs a script that scans for hardcoded secrets.
----
-```
-
-**The `description:` is routing logic, not just documentation.** Claude reads it to decide whether the skill applies to the current task. Get it wrong - too vague, too narrow, or using internal jargon - and the right skill never loads. `WeatherApiMislabeledSkillTests` exists to catch this kind of drift.
-
-## Layout
-
-```
-skills/<name>/                       strict policy (and any scripts)
-skills-weakened/<name>/              same shape, weaker rules - drift demo
-skills-mislabeled/<name>/            strict rules but description routes to wrong domain
-tests/Dockerfile                     agent runtime + prebuilt WeatherApi + all skill sets
-tests/run-skill.sh                   in-image helper: scaffolds workspace, runs Claude
-tests/AgentSkillTests/
-  SkillTestFixture.cs                one container per class, RunAsync(skill, prompt[, source])
-  SkillRun.cs                        workspace handle + WorkspaceContainsAsync, WorkspaceFindAsync, BuildAsync
-  SkillAssertions.cs                 shared asserts so test bodies stay declarative
-  WeatherApiSkillTests.cs            strict skill, positive tests
-  WeatherApiWeakenedSkillTests.cs    weakened rules - negative test
-  WeatherApiMislabeledSkillTests.cs  wrong description - negative test (selection failure)
-  SecretAuditSkillTests.cs           strict skill with script
-  HumanizeCodeSkillTests.cs          strict code-style skill
-  HumanizeCodeWeakenedSkillTests.cs  weakened - negative test
-```
-
-## Test conventions
-
-- One `[Fact]` per scenario. Method names follow `ItShould...` BDD style, PascalCase, no underscores.
-- Three sections in every test, marked with `// Arrange`, `// Act`, `// Assert` comments.
-- The prompt lives in the Arrange block as a `string` so it's right there at the read site.
-- The assertion is a single call into `SkillAssertions` so the test body stays declarative: read the test name, read the prompt, see which assertion fires. Don't read pattern lists in the test itself.
-
-## Add a test
-
-1. Drop `skills/<your-skill>/SKILL.md` (and any scripts it needs).
-2. Drop a matching copy under `skills-weakened/<your-skill>/` so the drift demo works.
-3. If selection (description routing) matters for your skill, drop a `skills-mislabeled/<your-skill>/` variant too.
-4. Add a test class:
-
-```csharp
-public class YourSkillTests(SkillTestFixture fixture, ITestOutputHelper output) : IClassFixture<SkillTestFixture>
-{
-    private const string Secret = "...";
-
-    [Fact]
-    public async Task ItShouldDoTheThing()
-    {
-        // Arrange
-        string prompt = """ ...your scenario... """;
-
-        // Act
-        SkillRun run = await fixture.RunAsync("your-skill", prompt);
-        output.WriteLine(run.Transcript);
-
-        // Assert
-        await SkillAssertions.AssertSecretIsProtectedAsync(run, Secret, output);
-    }
-}
-```
-
-For negative tests, pass `source: "skills-weakened"` (or `"skills-mislabeled"`) to `RunAsync` and call `AssertSecretLeakedAsync` instead.
-
-## How auth gets into the container
-
-Claude CLI needs *two* things to authenticate, not just one:
-
-1. The `CLAUDE_CODE_OAUTH_TOKEN` env var (or `ANTHROPIC_API_KEY`).
-2. The `~/.claude/.credentials.json` file that `claude setup-token` wrote on the host.
-
-The fixture bind-mounts that credentials file read-only into the container at `/home/tester/.claude/.credentials.json`. Without it, you get `401 Invalid bearer token` and tests silently pass with empty workspaces.
-
-If you do not want to bind-mount your host credentials, use `ANTHROPIC_API_KEY` instead - a regular API key from console.anthropic.com works standalone, no credentials file needed.
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `Docker is either not running or misconfigured` | Docker Desktop is off, or its Linux engine isn't running. | Start Docker Desktop. Wait for the tray icon to go green. |
-| `--dangerously-skip-permissions cannot be used with root/sudo privileges` | Container is running as root. | The Dockerfile creates a `tester` user; rebuild the image if it was cached from before. |
-| `Failed to authenticate. API Error: 401 Invalid bearer token` | `.credentials.json` not on the host or not mounted. | Run `claude setup-token` once on the host. Or set `ANTHROPIC_API_KEY`. |
-| Tests pass in ~12 seconds each with empty transcripts | Claude exited immediately - probably auth, see row above. | Check the transcript via `--logger "console;verbosity=detailed"`. |
-| `The process cannot access the file 'claudeskilltesting-runner-latest.tar'` | Parallel image builds raced on the tar archive in `%TEMP%`. | Already fixed: a static semaphore in the fixture builds the image once and shares it. |
-
-## CI
-
-`.github/workflows/skill-tests.yml` runs the full suite on PRs that touch `skills/`, `skills-weakened/`, `skills-mislabeled/`, or `tests/`. Add `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`) as a repo secret. CI uses the env var only - no bind-mounting credentials onto the runner.
-
-For larger suites (75+ skills), use `--filter` to restrict PR runs to affected test classes; let the full suite run on `main` push.
-
-## Known limitations
-
-- **No replay/cassette mode.** Every run spends real Claude tokens. A future improvement is to record the agent's response per (prompt + skill) hash and replay it for unchanged skills.
-- **Claude is non-deterministic.** Tests assert on outcomes (no leak, integration wired up), not on a specific code path. Stricter "must use user-secrets" assertions will flake. No retry - if a test flakes, fix the assertion.
-- **Bind-mounting host credentials is a security trade-off.** Read-only and into a disposable container, but if you don't want it visible there at all, use `ANTHROPIC_API_KEY`.
+- `WeatherApi/` — the project Claude edits during a test.
+- `skills/<name>/` — the strict skill.
+- `skills/<name>-weakened/` and `<name>-mislabeled/` — the drift variants the negative tests use.
+- `WeatherApi.SkillTests/` — one class per failure mode, methods named `ItShould…`.
+- `Dockerfile` and `run-skill.sh` — what the container does between "skill loaded" and "Claude finishes."
