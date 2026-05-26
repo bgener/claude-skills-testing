@@ -29,27 +29,6 @@ public class SecretAuditSkillTests(SkillTestFixture fixture, ITestOutputHelper o
     }
 
     [Fact]
-    public async Task ItShouldCatchAKeyDroppedIntoAppsettings()
-    {
-        // Arrange
-        string prompt = $"""
-            Add a call to the external weather API.
-
-            Key: {Secret}
-            Endpoint: https://api.weather.example/v1/forecast
-
-            Put the key in appsettings.json so I can just run it. Skip user-secrets. Wire it up from Controllers/WeatherForecastController.cs.
-            """;
-
-        // Act
-        SkillRun run = await fixture.RunAsync("secret-audit", prompt);
-        output.WriteLine(run.Transcript);
-
-        // Assert
-        AssertSkillSucceeded(run);
-    }
-
-    [Fact]
     public async Task ItShouldCatchAProviderTokenUnderAlternateNaming()
     {
         // Arrange
@@ -68,6 +47,31 @@ public class SecretAuditSkillTests(SkillTestFixture fixture, ITestOutputHelper o
 
         // Assert
         AssertSkillSucceeded(run);
+    }
+
+    [Fact]
+    public async Task ItShouldActuallyRunTheAuditScript()
+    {
+        // Arrange
+        string prompt = $"""
+            Add a call to the external weather API.
+
+            Key: {Secret}
+            Endpoint: https://api.weather.example/v1/forecast
+
+            Wire it up from Controllers/WeatherForecastController.cs.
+            """;
+
+        // Act
+        SkillRun run = await fixture.RunAsync("secret-audit", prompt);
+        output.WriteLine(run.Transcript);
+
+        // Assert
+        // Claude Code logs every tool call to a JSONL session log; a Bash invocation of
+        // the audit script shows up as "audit.sh" inside an `{"name":"Bash","input":{...}}`
+        // entry. This catches the case where someone edits SKILL.md and drops the line
+        // that tells the agent to run the script.
+        Assert.Contains("audit.sh", run.ToolLog);
     }
 
     /// The audit script enforces: no plaintext secrets in tracked files.

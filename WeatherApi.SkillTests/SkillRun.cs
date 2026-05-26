@@ -2,10 +2,13 @@ namespace WeatherApi.SkillTests;
 
 /// Handle to the bind-mounted host workspace the agent just edited.
 /// Files are read directly from disk - no docker exec round-trip.
-public sealed class SkillRun(string transcript, string hostWorkspace)
+/// ToolLog is the Claude Code session JSONL for this run; tests check it to
+/// verify the agent actually invoked a tool (e.g. a skill's script).
+public sealed class SkillRun(string transcript, string hostWorkspace, string toolLog)
 {
     public string Transcript { get; } = transcript;
     public string HostWorkspace { get; } = hostWorkspace;
+    public string ToolLog { get; } = toolLog;
 
     public string ReadFile(string relativePath)
     {

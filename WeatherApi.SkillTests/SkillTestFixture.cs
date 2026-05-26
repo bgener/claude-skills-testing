@@ -66,7 +66,23 @@ public sealed class SkillTestFixture : IAsyncLifetime
     {
         using CancellationTokenSource cts = new(TimeSpan.FromMinutes(15));
         ExecResult r = await _container.ExecAsync(["run-skill", skill, prompt], cts.Token);
-        return new SkillRun($"{r.Stdout}\n{r.Stderr}", _hostWorkspace);
+        string toolLog = await ReadLatestSessionLogAsync();
+        return new SkillRun($"{r.Stdout}\n{r.Stderr}", _hostWorkspace, toolLog);
+    }
+
+    /// Claude Code writes a JSONL session log of every tool call to
+    /// /home/tester/.claude/projects/<cwd-encoded>/<session>.jsonl. Returns the contents
+    /// of the most recently modified file so tests can verify that specific tool calls
+    /// (e.g. Bash invocations of a skill's script) actually happened.
+    private async Task<string> ReadLatestSessionLogAsync()
+    {
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(15));
+        ExecResult r = await _container.ExecAsync([
+            "bash", "-c",
+            "find /home/tester/.claude/projects -name '*.jsonl' -printf '%T@ %p\\n' 2>/dev/null " +
+            "| sort -nr | head -1 | cut -d' ' -f2- | xargs -r cat 2>/dev/null"
+        ], cts.Token);
+        return r.Stdout ?? "";
     }
 
     private static async Task<IFutureDockerImage> GetOrBuildImageAsync(string repoRoot)
